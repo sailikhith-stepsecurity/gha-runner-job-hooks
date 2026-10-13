@@ -73,7 +73,7 @@ export function httpGet(
 
     const request = client.get(
       parsedUrl,
-      { headers, timeout: timeoutMs },
+      { headers, timeout: timeoutMs, agent: envProxyAgent(parsedUrl) },
       (response) => {
         let data = "";
         response.setEncoding("utf8");
@@ -110,7 +110,7 @@ export function httpDownload(
 
     const request = client.get(
       parsedUrl,
-      { timeout: timeoutMs },
+      { timeout: timeoutMs, agent: envProxyAgent(parsedUrl) },
       (response) => {
         const statusCode = response.statusCode || 0;
         const location = response.headers.location;
@@ -290,6 +290,14 @@ export function handleFatalError(error: unknown): never {
   }
 
   process.exit(0);
+}
+
+// Honor HTTPS_PROXY / HTTP_PROXY / NO_PROXY via Node's built-in proxy support
+// (Node 22.21+ / 24.5+; older versions ignore `proxyEnv` and connect directly).
+function envProxyAgent(url: URL): http.Agent {
+  return url.protocol === "http:"
+    ? new http.Agent({ proxyEnv: process.env })
+    : new https.Agent({ proxyEnv: process.env });
 }
 
 function shouldRetryRequestError(
