@@ -15,6 +15,7 @@ VMs using GitHub Enterprise Server (GHES) or AWS CodeBuild, the hooks install
 and start the agent themselves.
 
 `node` must be installed on the runner and available on `PATH` as `node`.
+Proxy support requires a newer Node.js; see [HTTP proxy](#http-proxy).
 
 ## Linux runner modes
 
@@ -104,6 +105,29 @@ Notes:
 - The sample wrapper assigns configuration values explicitly, including empty
   identity values. Edit those assignments or change them to preserve inherited
   values before supplying configuration through the runner service environment.
+
+### HTTP proxy
+
+The hooks honor the standard proxy variables for policy, summary, release
+metadata, and agent download requests:
+
+| Variable | Description |
+| --- | --- |
+| `HTTPS_PROXY` / `https_proxy` | Proxy URL for HTTPS requests, e.g. `http://proxy.corp:3128`. Credentials may be embedded as `http://user:pass@host:port` (URL-encode special characters). |
+| `HTTP_PROXY` / `http_proxy` | Proxy URL for plain-HTTP requests. |
+| `NO_PROXY` / `no_proxy` | Comma-separated hosts to reach directly, e.g. `localhost,.internal.corp`. Use `.example.com` or `*.example.com` to match subdomains (a bare `example.com` matches only that host). `*` bypasses the proxy for all hosts. |
+
+Proxy support requires Node.js 22.21+ or 24.5+. Older versions ignore these
+variables and connect directly, so requests fail on networks that only allow
+traffic through the proxy.
+
+Set the variables in the runner service environment or the wrapper script. The
+sample wrapper preserves the runner environment through `sudo` (see
+[Linux wrapper setup](#linux-wrapper-setup)), and its `curl` bundle downloads
+honor the same variables.
+
+The proxy settings apply only to requests made by the hooks. The agent's own
+telemetry is configured separately.
 
 ## Runner hook variables
 
