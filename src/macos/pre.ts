@@ -1,7 +1,9 @@
 import * as fs from "fs";
+import * as os from "os";
 import { randomUUID } from "crypto";
 
 import {
+  logError,
   logInfo,
   logWarning,
   runCommand,
@@ -21,7 +23,10 @@ const POLICY_APPLIED_TIMEOUT_SECONDS = 10;
 
 export async function runMacOSPreJobHook(): Promise<void> {
   const ctx = getGithubRunContext();
-  const agentConfig = readJsonFile(Config.macos.files.agentJson);
+  const agentConfig = readAgentConfig(Config.macos.files.agentJson);
+  if (agentConfig === "unreadable") {
+    return;
+  }
   const apiKey = readString(agentConfig, "api_key");
   if (!apiKey) {
     logWarning("API key is empty; skipping policy fetch");
@@ -132,6 +137,27 @@ function writePolicyConfig(
     denied_endpoints: config.deniedEndpoints,
     egress_policy: config.egressPolicy,
   });
+}
+
+// The installer writes agent.json as root, but the hooks run as the runner
+// user. A permission error would otherwise read as an empty API key.
+function readAgentConfig(
+  filePath: string,
+): Record<string, unknown> | null | "unreadable" {
+  try {
+    fs.accessSync(filePath, fs.constants.R_OK);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "EACCES" && code !== "EPERM") {
+      return readJsonFile(filePath);
+    }
+    const user = os.userInfo().username;
+    logError(
+      `Cannot read ${filePath} as ${user} (${code}); skipping policy fetch. Grant the runner user read access, for example: sudo chown ${user} ${filePath}`,
+    );
+    return "unreadable";
+  }
+  return readJsonFile(filePath);
 }
 
 function readString(
