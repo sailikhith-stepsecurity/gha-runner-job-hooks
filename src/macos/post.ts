@@ -30,15 +30,23 @@ export async function runMacOSPostJobHook(): Promise<void> {
     readJsonFile(Config.macos.files.policyConfig),
     "correlation_id",
   );
-  const outcome = await fetchAndAppendSummary(
-    {
-      correlationId,
-      environment: "SelfHostedVM",
-      includeTimeRange: true,
-    },
-    Config.hooks.retry,
-  );
-  logMacOSSummaryOutcome(outcome);
+  if (correlationId) {
+    const outcome = await fetchAndAppendSummary(
+      {
+        correlationId,
+        environment: "SelfHostedVM",
+        includeTimeRange: true,
+      },
+      Config.hooks.retry,
+    );
+    logMacOSSummaryOutcome(outcome);
+  } else {
+    // The pre-job hook writes the correlation id; without it the summary
+    // request has an empty path segment and the API returns HTTP 500.
+    logWarning(
+      `No job correlation id in ${Config.macos.files.policyConfig}; skipping summary (see the pre-job hook output)`,
+    );
+  }
 
   cleanupJobFiles();
 
